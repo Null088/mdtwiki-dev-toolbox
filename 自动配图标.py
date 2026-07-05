@@ -597,6 +597,8 @@ local_data = [
     "block.ore-wall-tungsten = 钨（墙）"
 ]
 
+import subprocess
+
 #处理映射表
 def transform_dictionary(data_list):
     data_dictionary = {}
@@ -616,33 +618,36 @@ def transform_file(data_dictionary,key):
         return f"[[File:{value[0]}-{value[1]}-ui.png|18px|link={key}]][[{key}]]"
 
 
-data_dictionary,data_key = transform_dictionary(local_data)
-text_input = input("输入：")
-text_out = ""
-skip = 0
-#主循环
-for i in range(len(text_input)):
-    #跳过已经处理的字符
-    if skip > 0:
-        skip -= 1
-        continue
-    #在data_key(存储了所有的中文名称)中寻找包含text_input[i]的元素
-    find_key = [x for x in data_key if text_input[i] in x]
-    if find_key != []:
-        while find_key != []:
-            #获取find_key中最长的字符串
-            key_max_len = max(find_key,key=len)
-            #判断是否与text_input对应位置字段相同
-            if text_input[i:(i+len(key_max_len))] == key_max_len:
-                skip = len(key_max_len)-1
-                #将wiki格式输出添加到text_out中
-                text_out += transform_file(data_dictionary,key_max_len)
-                break
-            find_key.remove(key_max_len)
-            #如果find_key中的全部元素都不匹配就放弃
-            if find_key == []:
-                text_out += text_input[i]
-                break      
-    else:
-        text_out += text_input[i]
-print(text_out)
+data_dictionary , data_key = transform_dictionary(local_data)
+while True:
+    text_input = input("输入：")
+    text_out = ""
+    skip = 0
+    #主循环
+    for i in range(len(text_input)):
+        #跳过已经处理的字符
+        if skip > 0:
+            skip -= 1
+            continue
+        #在data_key(存储了所有的中文名称)中寻找包含text_input[i]的元素
+        find_key = [x for x in data_key if text_input[i] in x]
+        if find_key != []:
+            while find_key != []:
+                #获取find_key中最长的字符串
+                key_max_len = max(find_key,key=len)
+                #判断是否与text_input对应位置字段相同
+                if text_input[i:(i+len(key_max_len))] == key_max_len:
+                    skip = len(key_max_len)-1
+                    #将wiki格式输出添加到text_out中
+                    text_out += transform_file(data_dictionary,key_max_len)
+                    break
+                find_key.remove(key_max_len)
+                #如果find_key中的全部元素都不匹配就放弃
+                if find_key == []:
+                    text_out += text_input[i]
+                    break
+        else:
+            text_out += text_input[i]
+    print(f"\n{text_out}")
+    subprocess.run("clip" , input=text_out.encode("gbk"))
+    print(f"\n已自动复制到剪切板")

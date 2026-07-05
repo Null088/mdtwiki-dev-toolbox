@@ -598,29 +598,56 @@ local_data = [
 ]
 
 import subprocess
+import time
+
+setting = {
+    #输出格式 1为[[File:]]格式(还没做)
+    "out_mode" : 1 ,
+    #是否启用索引以缩短处理用时
+    "use_index" : True
+}
 
 #处理映射表
 def transform_dictionary(data_list):
+    data_index = {}
     data_dictionary = {}
     data_key= []
     for text in data_list:
         text = text.split(" = ")
         data_key.append(text[1])
         data_dictionary[text[1]]=text[0]
-    return data_dictionary,data_key
+        if setting["use_index"] == True:
+            key_index = text[1][0]
+            #判断data_index是否有对应值，如果有就添加，没有则添加默认值
+            if data_index.setdefault(key_index,[text[1]]) != [text[1]]:
+                data_index[key_index].append(text[1])
+    return data_dictionary , data_key , data_index
+
+#匹配find_key中的元素是否正确
+def match_key(find_key):
+    find_key = find_key
+    while find_key != []:
+        #获取find_key中最长的字符串
+        key_max_len = max(find_key,key=len)
+        #判断是否与text_input对应位置字段相同
+        if text_input[i:(i+len(key_max_len))] == key_max_len:
+            return len(key_max_len)-1 , transform_file(key_max_len)
+        find_key.remove(key_max_len)
+        #如果find_key中的全部元素都不匹配就放弃
+    return 0 , text_input[i]
 
 #转化成wiki格式
-def transform_file(data_dictionary,key):
+def transform_file(key):
     value = data_dictionary[key].split(".")
     if "planet" in value:
         return f"[[File:{value[0]}-{value[1]}.png|18px|link={key}]][[{key}]]"
     else:
         return f"[[File:{value[0]}-{value[1]}-ui.png|18px|link={key}]][[{key}]]"
 
-
-data_dictionary , data_key = transform_dictionary(local_data)
+data_dictionary , data_key , data_index = transform_dictionary(local_data)
 while True:
     text_input = input("输入：")
+    start_time = time.perf_counter()
     text_out = ""
     skip = 0
     #主循环
@@ -629,25 +656,31 @@ while True:
         if skip > 0:
             skip -= 1
             continue
-        #在data_key(存储了所有的中文名称)中寻找包含text_input[i]的元素
-        find_key = [x for x in data_key if text_input[i] in x]
-        if find_key != []:
-            while find_key != []:
-                #获取find_key中最长的字符串
-                key_max_len = max(find_key,key=len)
-                #判断是否与text_input对应位置字段相同
-                if text_input[i:(i+len(key_max_len))] == key_max_len:
-                    skip = len(key_max_len)-1
-                    #将wiki格式输出添加到text_out中
-                    text_out += transform_file(data_dictionary,key_max_len)
-                    break
-                find_key.remove(key_max_len)
-                #如果find_key中的全部元素都不匹配就放弃
-                if find_key == []:
-                    text_out += text_input[i]
-                    break
+
+        if setting["use_index"] == False:
+            #在data_key(存储了所有的中文名称)中寻找包含text_input[i]的元素
+            find_key = [x for x in data_key if text_input[i] in x]
+            if find_key != []:
+                skip , match_key_out = match_key(find_key)
+                text_out += match_key_out
+            else:
+                text_out += text_input[i]
+        #使用索引
+        elif setting["use_index"] == True:
+            if text_input[i] in data_index:
+                #切片复制避免影响索引
+                find_key = data_index[text_input[i]][:]
+                skip , match_key_out = match_key(find_key)
+                text_out += match_key_out
+            else:
+                text_out += text_input[i]
+
         else:
-            text_out += text_input[i]
+            print("use_index数据错误")
+            break
+        
     print(f"\n{text_out}")
     subprocess.run("clip" , input=text_out.encode("gbk"))
     print(f"\n已自动复制到剪切板")
+    end_time = time.perf_counter()
+    print(f"处理用时：{end_time-start_time:.6f} 秒\n")

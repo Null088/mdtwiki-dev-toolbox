@@ -65,7 +65,7 @@ def main():
     #主逻辑
     while True:
         text_input_list = input("输入：")
-        #正则表达式 按照[[]]与{{}}的格式进行分割处理
+        #正则表达式 按照[[……]]与{{……}}的格式进行分割处理
         text_input_list = [p for p in re.split(r"(\[\[.*?\]\]|\{\{.*?\}\})", text_input_list) if p]
 
         start_time = time.perf_counter()
@@ -73,8 +73,8 @@ def main():
         skip = 0
         #主循环
         for text_input in text_input_list:
-            #判断是否存在[[]]或{{}}的格式，如果存在则不处理直接输出
-            if bool(re.search(r"(\[\[.*?\]\]|\{\{.*?\}\})", text_input)):
+            #判断是否存在[[……]]或{{……}}的格式，如果存在则不处理直接输出
+            if text_input[:2] + text_input[-2:] in ["[[]]", "{{}}"]:
                 text_out += str(text_input)
             else:
                 for i in range(len(text_input)):
@@ -103,7 +103,7 @@ def main():
                     
         print(f"\n{text_out}")
         try:
-            subprocess.run("clip", input=text_out.encode("gbk"))
+            subprocess.run("clip", input = text_out.encode("gbk"))
         except:
             print("\n自动复制失败（该功能仅在 Windows下可用）")
         else:

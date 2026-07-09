@@ -1,13 +1,18 @@
 import subprocess
 import re
 import time
+import sys
 
 #设置
 setting = {
-    #输出模式 F为[[File:]]格式 P为{{picture}}格式
-    "out_mode" : "F",
+    #输出模式 F为[[File:]]格式 P为{{picture}}格式 RE为恢复模式(将已有格式撤销)
+    "out_mode":"F",
     #是否启用索引以缩短处理用时，仅在数据量极大的情况下有明显效果
-    "use_index" : True
+    "use_index":True,
+    #是否读取文件，开启该模式时无法使用控制台进行输入
+    "read_file":True,
+    #读取文件的文件名
+    "input_file_name":"input_file.txt"
 }
 
 #匹配find_key中的元素是否正确
@@ -38,7 +43,12 @@ def transform_file(key):
         else:
             return f"{{{{picture|{key}}}}}[[{key}]]"
     else:
-        return "<请检查out_mode的数据是否正确>"
+        ErrorExit("请检查out_mode的数据是否正确")
+
+#异常退出
+def ErrorExit(text_error="异常退出",error_info=0):
+    print(text_error, file=sys.stderr)
+    sys.exit(error_info)
 
 def main():
     #定义全局变量
@@ -62,55 +72,112 @@ def main():
             #判断data_index是否有对应值，如果有就添加，没有则添加默认值
             if data_index.setdefault(key_index,[data[1]]) != [data[1]]:
                 data_index[key_index].append(data[1])
-    #主逻辑
+    #控制台主逻辑
     while True:
-        text_input_list = input("输入：")
+        if setting["read_file"] == False:
+            text_input_list = input("输入：")
+            
+        elif setting["read_file"] == True:
+            try:
+                with open(setting["input_file_name"], "r", encoding="utf-8") as file:
+                    text_input_list = file.read()
+            except:
+                ErrorExit(f"在读取文件 {setting['input_file_name']} 时发生错误，请检查文件名是否正确")
+            else:
+                #如果读取成功则直接下一步
+                pass
+        else:
+            ErrorExit("请检查read_file的数据是否正确")
+            return
+
         #正则表达式 按照[[……]]与{{……}}的格式进行分割处理
         text_input_list = [p for p in re.split(r"(\[\[.*?\]\]|\{\{.*?\}\})", text_input_list) if p]
-
+        
         start_time = time.perf_counter()
         text_out = ""
         skip = 0
-        #主循环
-        for text_input in text_input_list:
-            #判断是否存在[[……]]或{{……}}的格式，如果存在则不处理直接输出
-            if text_input[:2] + text_input[-2:] in ["[[]]", "{{}}"]:
-                text_out += str(text_input)
-            else:
-                for i in range(len(text_input)):
-                    #跳过已经处理的字符
-                    if skip > 0:
-                        skip -= 1
-                        continue
+        
+        #恢复模式
+        if setting["out_mode"] == "RE":
+            len_text_input_list = len(text_input_list)
+            for i in range(len_text_input_list):
+                if skip > 0:
+                    skip -= 1
+                    continue
 
-                    #不使用索引时
-                    if setting["use_index"] == False:
-                        #在data_key(存储了所有的中文名称)中寻找包含text_input[i]的元素
-                        find_key = [x for x in data_key if text_input[i] in x]
-                        
-                    #使用索引时
+                text_input = text_input_list[i]
+                #判断是否存在[[……]]或{{……}}的格式，如果存在则进行恢复
+                if  text_input[:2] + text_input[-2:] in ["[[]]", "{{}}"]:
+                    #（i+1的判断是为避免索引越界）
+                    if  i+1 < len_text_input_list and text_input_list[i+1][:2] + text_input_list[i+1][-2:] == "[[]]":
+                        skip += 1
+                        #将[[File]]/{{picture}}[[……]]中[[……]]的内容添加到text_out
+                        text_out += text_input_list[i+1][2:-2]
                     else:
-                        if text_input[i] in data_index:
-                            #切片复制避免影响索引
-                            find_key = data_index[text_input[i]][:]
+                        #如果首个元素中包含"[["，则认为是[[File]]格式
+                        if "[[" in text_input[0]:
+                            #使用正则表达式获取"link="后的数据
+                            text_out += re.search(r'link=([^|\]]+)', text_input)
+                        #否则认为是{{picture}}格式
                         else:
-                            find_key = []
-                
-                    if find_key != []:
-                        text_out += match_key(find_key)
-                    else:
-                        text_out += text_input[i]
-                    
-        print(f"\n{text_out}")
-        try:
-            subprocess.run("clip", input = text_out.encode("gbk"))
-        except:
-            print("\n自动复制失败（该功能仅在 Windows下可用）")
+                            #正则表达式 按照"|" "]]" "}}"将文本分割
+                            text_input = re.split(r'\||\]\]|\}\}', text_input)
+                            text_out += text_input[1]
+                else:
+                    text_out += text_input
+        #主循环 正向映射 
         else:
-            print("\n已自动复制到剪切板")
+            for text_input in text_input_list:
+                #判断是否存在[[……]]或{{……}}的格式，如果存在则不处理直接输出
+                if text_input[:2] + text_input[-2:] in ["[[]]", "{{}}"]:
+                    text_out += str(text_input)
+                else:
+                    for i in range(len(text_input)):
+                        #跳过已经处理的字符
+                        if skip > 0:
+                            skip -= 1
+                            continue
+
+                        #不使用索引时
+                        if setting["use_index"] == False:
+                            #在data_key(存储了所有的中文名称)中寻找包含text_input[i]的元素
+                            find_key = [x for x in data_key if text_input[i] in x]
+                            
+                        #使用索引时
+                        else:
+                            if text_input[i] in data_index:
+                                #切片复制避免影响索引
+                                find_key = data_index[text_input[i]][:]
+                            else:
+                                find_key = []
+                    
+                        if find_key != []:
+                            text_out += match_key(find_key)
+                        else:
+                            text_out += text_input[i]
+                    
+        if setting["read_file"] == False:
+            print(f"\n{text_out}")
+            try:
+                subprocess.run("clip", input = text_out.encode("gbk"))
+            except:
+                print("\n自动复制失败（该功能仅在 Windows下可用）")
+            else:
+                print("\n已自动复制到剪切板")
+        else:
+            try:
+                with open("output.txt", "w", encoding="utf-8") as file:
+                    file.write(text_out)
+            except:
+                ErrorExit("\n文件保存失败")
+            else:
+                print("\n文件已保存到 output.txt 中")
         end_time = time.perf_counter()
         print(f"处理用时：{end_time-start_time:.6f} 秒")
         print("-"*30)
+        if setting["read_file"] == True:
+            return
+
 
 #数据
 local_data_list = [

@@ -14,7 +14,7 @@ setting = {
     #是否启用索引以缩短处理用时，仅在数据量极大的情况下有明显效果
     "use_index":True,
     #是否读取文件，开启该模式时无法使用控制台进行输入
-    "read_file":True,
+    "read_file":False,
     #读取文件的文件名
     "input_file_name":"input_file.txt"
 }

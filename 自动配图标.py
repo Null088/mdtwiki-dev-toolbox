@@ -2,6 +2,8 @@ import subprocess
 import re
 import time
 import sys
+import os
+
 
 #设置
 setting = {
@@ -12,7 +14,7 @@ setting = {
     #是否启用索引以缩短处理用时，仅在数据量极大的情况下有明显效果
     "use_index":True,
     #是否读取文件，开启该模式时无法使用控制台进行输入
-    "read_file":False,
+    "read_file":True,
     #读取文件的文件名
     "input_file_name":"input_file.txt"
 }
@@ -57,6 +59,8 @@ def ErrorExit(text_error="异常退出",error_info=0):
     sys.exit(error_info)
 
 def main():
+    #切换工作目录
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
     #定义全局变量
     global data_index
     global data_dictionary
@@ -96,10 +100,9 @@ def main():
             ErrorExit("请检查read_file的数据是否正确")
             return
 
+        start_time = time.perf_counter()
         #正则表达式 按照[[……]]与{{……}}的格式进行分割处理
         text_input_list = [p for p in re.split(r"(\[\[.*?\]\]|\{\{.*?\}\})", text_input_list) if p]
-        
-        start_time = time.perf_counter()
         text_output = ""
         skip = 0
 

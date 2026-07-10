@@ -50,7 +50,7 @@ def load_config():
 
 def get_file_path():
     input_file_path = os.path.join(BASE_DIR, config["input_file_name"])
-    output_file_path = os.path.join(BASE_DIR, "output.txt")
+    output_file_path = os.path.join(BASE_DIR, f"{config['input_file_name']}(output).txt")
     return input_file_path, output_file_path
 
 #匹配find_key中的元素是否正确
@@ -246,7 +246,7 @@ def main():
             except:
                 ErrorExit("\n文件保存失败")
             else:
-                print("\n文件已保存到 output.txt 中")
+                print(f"\n文件已保存到 {config['input_file_name']}(output).txt 中")
         end_time = time.perf_counter()
         print(f"处理用时：{end_time-start_time:.6f} 秒")
         print("-"*30)

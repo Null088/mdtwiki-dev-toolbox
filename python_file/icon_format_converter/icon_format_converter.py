@@ -17,7 +17,9 @@ DEFAULT_CONFIG = {
     #是否读取文件，开启该模式时无法使用控制台进行输入
     "read_file":False,
     #读取文件的文件名
-    "input_file_name":"input_file.txt"
+    "input_file_name":"input_file.txt",
+    #自动复制 关闭时将改用组合键复制
+    "auto_copy":True
 }
 #此处赋值仅便于调用
 config = DEFAULT_CONFIG.copy()
@@ -123,6 +125,19 @@ def ErrorExit(text_error="异常退出",error_info=0):
     input(">按下Enter以关闭窗口")
     sys.exit(error_info)
 
+#复制输出文本
+def copy_output(_text_output):
+    if not config["auto_copy"]:
+        print("")
+    try:
+        subprocess.run("clip", input = _text_output.encode("gbk"))
+    except:
+        print("\n自动复制失败（该功能仅在 Windows下可用）")
+    else:
+        print("\n已自动复制到剪切板")
+    if not config["auto_copy"]:
+        print("\n"+"-"*30)
+
 def main():
     #定义全局变量
     global DATA_INDEX
@@ -153,18 +168,15 @@ def main():
     #控制台主逻辑
     while True:
         if config["read_file"] == False:
-            try:
+            if config["auto_copy"]:
                 text_input_list = input("输入：")
-
-            #按住Ctrl+C时执行自动复制
-            except KeyboardInterrupt:
+            else:
                 try:
-                    subprocess.run("clip", input = text_output.encode("gbk"))
-                except:
-                    print("\n\n自动复制失败（该功能仅在 Windows下可用）\n")
-                else:
-                    print("\n\n已自动复制到剪切板\n")
-                continue
+                    text_input_list = input("输入：")
+                #按下Ctrl+C时 进行复制
+                except KeyboardInterrupt:
+                    copy_output(text_output)
+                    continue
             
         elif config["read_file"] == True:
             try:
@@ -273,10 +285,11 @@ def main():
                     text_output += text_input
                     
         if config["read_file"] == False:
-            print(
-                f"\n{text_output}"
-                "\n\n按下 Ctrl+C 将会自动复制输出文本"
-            )
+            print(f"\n{text_output}")
+            if config["auto_copy"]:
+                copy_output(text_output)
+            else:
+                print("\n按下 Ctrl+C 可将输出文本自动复制到剪切板")
             
         else:
             try:
@@ -302,7 +315,7 @@ CONFIG_RULES = {
     "processing_mode": {
         "type": str,
         "allowed": ["N", "C", "RES"],
-        "error": "只能为 'N'、'C' 或 'RES'"
+        "error": "只能为'N' 'C' 或 'RES'"
     },
     "use_index": {
         "type": bool,
@@ -315,6 +328,10 @@ CONFIG_RULES = {
     "input_file_name": {
         "type": str,
         "error": "必须为非空字符串"
+    },
+    "auto_copy": {
+        "type": bool,
+        "error": "必须为布尔值（true / false）"
     }
 }
 #数据

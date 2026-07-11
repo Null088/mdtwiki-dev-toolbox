@@ -153,7 +153,18 @@ def main():
     #控制台主逻辑
     while True:
         if config["read_file"] == False:
-            text_input_list = input("输入：")
+            try:
+                text_input_list = input("输入：")
+
+            #按住Ctrl+C时执行自动复制
+            except KeyboardInterrupt:
+                try:
+                    subprocess.run("clip", input = text_output.encode("gbk"))
+                except:
+                    print("\n\n自动复制失败（该功能仅在 Windows下可用）\n")
+                else:
+                    print("\n\n已自动复制到剪切板\n")
+                continue
             
         elif config["read_file"] == True:
             try:
@@ -262,13 +273,11 @@ def main():
                     text_output += text_input
                     
         if config["read_file"] == False:
-            print(f"\n{text_output}")
-            try:
-                subprocess.run("clip", input = text_output.encode("gbk"))
-            except:
-                print("\n自动复制失败（该功能仅在 Windows下可用）")
-            else:
-                print("\n已自动复制到剪切板")
+            print(
+                f"\n{text_output}"
+                "\n\n按下 Ctrl+C 将会自动复制输出文本"
+            )
+            
         else:
             try:
                 with open(output_file_path, "w", encoding="utf-8") as file:

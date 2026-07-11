@@ -7,7 +7,7 @@ import json
 
 
 #默认设置
-default_config = {
+DEFAULT_CONFIG = {
     #输出模式 F为[[File:]]格式 P为{{picture}}格式 
     "output_mode":"F",
     #处理模式 N为默认 C为替换模式(仅处理已有格式) RES为恢复模式(将已有格式撤销)
@@ -20,7 +20,7 @@ default_config = {
     "input_file_name":"input_file.txt"
 }
 #此处赋值仅便于调用
-config = default_config
+config = DEFAULT_CONFIG.copy()
 
 def get_base_dir():
     if getattr(sys, 'frozen', False):
@@ -35,17 +35,47 @@ def load_config():
     global config
     #构建配置文件路径
     config_path = os.path.join(BASE_DIR, "config.json")
+    config_error = False
 
     if not os.path.exists(config_path):
         with open(config_path, "w", encoding="utf-8") as file:
-            json.dump(default_config, file, indent=4, ensure_ascii=False)
+            json.dump(DEFAULT_CONFIG, file, indent=4, ensure_ascii=False)
         ErrorExit("未找到配置文件 config.json ，已重新生成，请确保新 config.json 文件无误后重新运行程序")
 
     try:
         with open(config_path, "r", encoding="utf-8") as file:
             config = json.load(file)
-    except:
-        ErrorExit("在读取配置文件 config.json 中的设置时出现了问题（可尝试删除原 config.json ，程序会重新生成的）")
+        #config类型校验
+        if not isinstance(config, dict):
+            print("config.json 不为字典类型，将按照默认配置 DEFAULT_CONFIG 执行程序")
+            config_error = True
+        #config值键检验
+        for config_rules_key in CONFIG_RULES:
+            config_rules_value = CONFIG_RULES[config_rules_key]
+            try:
+                config_value = config[config_rules_key]
+                if (
+                    ("allowed" in config_rules_value and config_value not in config_rules_value["allowed"])
+                    or not isinstance(config_value, config_rules_value["type"])
+                ):
+                    ErrorExit(
+                        f"{config_rules_key}{config_rules_value['error']}"
+                        "\n提示：删除 config.json 后会重新生成一个正确的默认文件"
+                    )
+            except KeyError:
+                ErrorExit(
+                    f"{config_rules_key}缺失"
+                    "\n提示：删除 config.json 后会重新生成一个正确的默认配置文件"
+                )
+    except json.JSONDecodeError:
+        print("config.json 不符合JSON文件格式，将按照默认配置 DEFAULT_CONFIG 执行程序")
+        config_error = True
+    #错误提示
+    if config_error:
+        print("默认配置 DEFAULT_CONFIG 如下：")
+        for config_key in DEFAULT_CONFIG:
+            print(f"{config_key}: {DEFAULT_CONFIG[config_key]}")
+        print("\n")
 
 
 def get_file_path():
@@ -69,7 +99,7 @@ def match_key(_find_key):
 
 #转化成wiki的[[File:]]格式或{{picture}}格式
 def transform_format(key,size="18"):
-    value = data_dictionary[key].split(".")
+    value = DATA_DICTIONARY[key].split(".")
     if config["processing_mode"] == "C":
         text_input_end = ""
     else:
@@ -95,9 +125,9 @@ def ErrorExit(text_error="异常退出",error_info=0):
 
 def main():
     #定义全局变量
-    global data_index
-    global data_dictionary
-    global data_key
+    global DATA_INDEX
+    global DATA_DICTIONARY
+    global DATA_KEY
     global text_input
     global i
     global skip
@@ -108,18 +138,18 @@ def main():
     load_config()
     input_file_path, output_file_path = get_file_path()
     #处理映射表
-    data_index = {}
-    data_dictionary = {}
-    data_key = []
-    for data in local_data_list:
+    DATA_INDEX = {}
+    DATA_DICTIONARY = {}
+    DATA_KEY = []
+    for data in RAW_DATA_LIST:
         data = data.split(" = ")
-        data_key.append(data[1])
-        data_dictionary[data[1]]=data[0]
+        DATA_KEY.append(data[1])
+        DATA_DICTIONARY[data[1]]=data[0]
         if config["use_index"] == True:
             key_index = data[1][0]
             #判断data_index是否有对应值，如果有就添加，没有则添加默认值
-            if data_index.setdefault(key_index,[data[1]]) != [data[1]]:
-                data_index[key_index].append(data[1])
+            if DATA_INDEX.setdefault(key_index,[data[1]]) != [data[1]]:
+                DATA_INDEX[key_index].append(data[1])
     #控制台主逻辑
     while True:
         if config["read_file"] == False:
@@ -157,12 +187,12 @@ def main():
                         #不使用索引时
                         if config["use_index"] == False:
                             #在data_key(存储了所有的中文名称)中寻找包含text_input[i]的元素
-                            find_key = [x for x in data_key if text_input[i] in x]
+                            find_key = [x for x in DATA_KEY if text_input[i] in x]
                         #使用索引时
                         else:
-                            if text_input[i] in data_index:
+                            if text_input[i] in DATA_INDEX:
                                 #切片复制避免影响索引
-                                find_key = data_index[text_input[i]][:]
+                                find_key = DATA_INDEX[text_input[i]][:]
                             else:
                                 find_key = []
                     
@@ -253,8 +283,33 @@ def main():
         if config["read_file"] == True:
             return
 
+#config检验逻辑
+CONFIG_RULES = {
+    "output_mode": {
+        "type": str,
+        "allowed": ["F", "P"],
+        "error": "只能为 'F' 或 'P'"
+    },
+    "processing_mode": {
+        "type": str,
+        "allowed": ["N", "C", "RES"],
+        "error": "只能为 'N'、'C' 或 'RES'"
+    },
+    "use_index": {
+        "type": bool,
+        "error": "必须为布尔值（true / false）"
+    },
+    "read_file": {
+        "type": bool,
+        "error": "必须为布尔值（true / false）"
+    },
+    "input_file_name": {
+        "type": str,
+        "error": "必须为非空字符串"
+    }
+}
 #数据
-local_data_list = [
+RAW_DATA_LIST = [
     #星球
     "planet.serpulo.name = 塞普罗",
     "planet.erekir.name = 埃里克尔",
